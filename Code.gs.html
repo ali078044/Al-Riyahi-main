@@ -1,0 +1,1679 @@
+// ==========================================================
+//                     الإعدادات العامة
+// ==========================================================
+// (لا تقم بتغيير هذا التوكن إلا إذا قمت بتغييره في تليجرام)
+const TELEGRAM_BOT_TOKEN = '8439263979:AAEaJWHx0pVoG3V9z-d8FzGCov8UrBG0WFU'; 
+
+// تعريف أسماء الصفحات
+// تعريف أسماء الصفحات
+// تعريف أسماء الصفحات
+// (التعديل الكامل) تعريف أسماء الصفحات وإضافة جدول التتبع الجديد
+const SHEETS = {
+  USERS: 'المستخدمون',
+  GRADES: 'الدرجات_2025_2026',
+  GRADES_ARCHIVE: 'أرشيف_الدرجات',
+  ABSENCES: 'الغيابات',
+  ANNOUNCEMENTS: 'الاخبار',
+  SETTINGS: 'إعدادات_النظام',
+  HOMEWORK: 'الواجبات',
+  DAILY_EVALUATIONS: 'التقييمات_اليومية',
+  LIBRARY: 'المكتبة_الرقمية',
+  EXAM_SCHEDULES: 'جداول_الامتحانات',
+  WEEKLY_SCHEDULES: 'الجداول_الأسبوعية',
+  TEACHER_ASSIGNMENTS: 'TeacherAssignments',
+  OBJECTIONS: 'الاعتراضات',
+  VIEWS_TRACKING: 'تتبع_المشاهدات' // (جديد) لميزة تتبع المشاهدات
+};
+
+/**
+ * دالة لإنشاء وتحديث جميع الصفحات والأعمدة المطلوبة تلقائياً
+ * (تم تعديلها لتشمل جدول التتبع الجديد)
+ */
+/**
+ * دالة لإنشاء وتحديث جميع الصفحات والأعمدة المطلوبة تلقائياً
+ * تقوم بفحص النقص في الأعمدة وإضافته دون المساس بالبيانات القديمة
+ */
+function createRequiredSheets() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ui = SpreadsheetApp.getUi();
+  let addedSheets = 0;
+  let addedColumns = 0;
+  
+  const schema = {
+    [SHEETS.USERS]: ['ID', 'Email', 'Password', 'Role', 'FullName', 'Status', 'Class', 'Section', 'GuardianName', 'GuardianPhone', 'StudentPhone', 'CanRecordAbsence', 'TelegramID', 'SessionToken', 'MotherName', 'Address', 'DOB', 'BloodType', 'MedicalNotes', 'ProfilePic'],
+    [SHEETS.GRADES]: ['RecordID', 'StudentID', 'Subject', 'GradeType', 'Grade', 'Term1_Avg', 'MidYear_Exam', 'Term2_Avg', 'Yearly_Effort', 'Final_Exam', 'Final_Result', 'GradeNotes', 'UpdatedAt', 'UpdatedByID', 'Status', 'ChangesJSON', 'UpdatedByName', 'TelegramStatus'], 
+    [SHEETS.ABSENCES]: ['AbsenceID', 'StudentID', 'Date', 'Notes', 'RecordedBy', 'Status', 'TelegramStatus'],
+    [SHEETS.ANNOUNCEMENTS]: ['AnnounceID', 'Date', 'Title', 'Audience', 'Content', 'PostedBy'],
+    [SHEETS.SETTINGS]: ['SettingKey', 'SettingValue', 'Description'],
+    [SHEETS.HOMEWORK]: ['HomeworkID', 'SubmitDate', 'Class', 'Section', 'Subject', 'Status', 'Content', 'TeacherName', 'TelegramStatus', 'SentDate'], 
+    [SHEETS.DAILY_EVALUATIONS]: ['EvalID', 'StudentID', 'TeacherID', 'Date', 'Subject', 'DailyPrep', 'Participation', 'Behavior', 'Homework', 'Note', 'Status', 'TeacherName', 'TelegramStatus'],
+    [SHEETS.LIBRARY]: ['LinkID', 'Date', 'Title', 'URL', 'Class', 'Status', 'Subject', 'Description', 'TeacherName', 'TelegramStatus'],
+    [SHEETS.EXAM_SCHEDULES]: ['ExamScheduleID', 'Date', 'TargetClass', 'Title', 'ScheduleDataJSON'],
+    [SHEETS.WEEKLY_SCHEDULES]: ['ScheduleID', 'TargetClass', 'TargetSection', 'ScheduleDataJSON', 'LastUpdated'],
+    [SHEETS.TEACHER_ASSIGNMENTS]: ['TeacherID', 'TeacherName', 'Class', 'Section', 'Subject'],
+    [SHEETS.OBJECTIONS]: ['ObjectionID', 'Date', 'StudentID', 'Subject', 'Content', 'AdminStatus', 'TeacherStatus', 'TeacherID', 'TeacherReply'],
+    [SHEETS.VIEWS_TRACKING]: ['ViewID', 'ItemID', 'ItemType', 'StudentID', 'ViewDate']
+  };
+
+  for (const sheetName in schema) {
+    let sheet = ss.getSheetByName(sheetName);
+    const headers = schema[sheetName];
+    
+    if (!sheet) {
+      // إنشاء الصفحة إذا لم تكن موجودة
+      sheet = ss.insertSheet(sheetName);
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold').setBackground('#eeeeee');
+      sheet.setFrozenRows(1);
+      addedSheets++;
+    } else {
+      // إذا كانت الصفحة موجودة، نفحص نقص الأعمدة
+      const currentHeaders = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
+      headers.forEach((header) => {
+        if (!currentHeaders.includes(header)) {
+          const newColIndex = sheet.getLastColumn() + 1;
+          sheet.getRange(1, newColIndex).setValue(header).setFontWeight('bold').setBackground('#eeeeee');
+          currentHeaders.push(header); // تحديث القائمة المحلية لتجنب التكرار
+          addedColumns++;
+        }
+      });
+    }
+  }
+  
+  ui.alert('تمت العملية بنجاح:\n- صفحات جديدة: ' + addedSheets + '\n- أعمدة مضافة: ' + addedColumns);
+}
+
+/**
+ * دالة مخصصة لإنشاء صفحة تتبع المشاهدات فقط في حال عدم وجودها
+ */
+function initTrackingSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheetName = 'تتبع_المشاهدات';
+  const headers = ['ViewID', 'ItemID', 'ItemType', 'StudentID', 'ViewDate'];
+  
+  let sheet = ss.getSheetByName(sheetName);
+  
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+    sheet.getRange(1, 1, 1, headers.length)
+         .setValues([headers])
+         .setFontWeight('bold')
+         .setBackground('#eeeeee');
+    sheet.setFrozenRows(1);
+    SpreadsheetApp.getUi().alert('تم إضافة صفحة تتبع_المشاهدات بنجاح!');
+  } else {
+    SpreadsheetApp.getUi().alert('الصفحة موجودة بالفعل، لا حاجة لإضافتها.');
+  }
+}
+
+
+// ==========================================================
+//               دالة الإعداد (محدثة)
+// ==========================================================
+/**
+ * عند فتح ملف جوجل شيت، يضيف قائمة مخصصة لتشغيل الإعداد
+ */
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('إعدادات النظام')
+    .addItem('إنشاء/تحديث الصفحات والبيانات التجريبية', 'createRequiredSheets')
+    .addToUi();
+}
+
+/**
+ * دالة لإنشاء جميع الصفحات والأعمدة المطلوبة تلقائياً
+ */
+function createRequiredSheets() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ui = SpreadsheetApp.getUi();
+  
+  // (تم تعديل الأعمدة هنا لتطابق الكود الجديد)
+ const schema = {
+    [SHEETS.USERS]: ['ID', 'Email', 'Password', 'Role', 'FullName', 'Status', 'Class', 'Section', 'GuardianName', 'GuardianPhone', 'StudentPhone', 'CanRecordAbsence', 'TelegramID'],
+    [SHEETS.GRADES]: ['RecordID', 'StudentID', 'Subject', 'GradeType', 'Grade', 'Term1_Avg', 'MidYear_Exam', 'Term2_Avg', 'Yearly_Effort', 'Final_Exam', 'Final_Result', 'GradeNotes', 'UpdatedAt', 'UpdatedByID', 'Status', 'ChangesJSON', 'UpdatedByName', 'TelegramStatus'], 
+    [SHEETS.GRADES_ARCHIVE]: ['RecordID', 'StudentID', 'Subject', 'GradeType', 'Grade', 'Term1_Avg', 'MidYear_Exam', 'Term2_Avg', 'Yearly_Effort', 'Final_Exam', 'Final_Result', 'GradeNotes', 'UpdatedAt', 'UpdatedByID', 'Status', 'ChangesJSON', 'UpdatedByName', 'TelegramStatus'],
+    [SHEETS.ABSENCES]: ['AbsenceID', 'StudentID', 'Date', 'Notes', 'RecordedBy', 'Status', 'TelegramStatus'],
+    [SHEETS.ANNOUNCEMENTS]: ['AnnounceID', 'Date', 'Title', 'Audience', 'Content', 'PostedBy'],
+    [SHEETS.SETTINGS]: ['SettingKey', 'SettingValue', 'Description'],
+    [SHEETS.HOMEWORK]: ['HomeworkID', 'SubmitDate', 'Class', 'Section', 'Subject', 'Status', 'Content', 'TeacherName', 'TelegramStatus', 'SentDate'], 
+    [SHEETS.DAILY_EVALUATIONS]: ['EvalID', 'StudentID', 'TeacherID', 'Date', 'Subject', 'DailyPrep', 'Participation', 'Behavior', 'Homework', 'Note', 'Status', 'TeacherName', 'TelegramStatus'],
+    [SHEETS.LIBRARY]: ['LinkID', 'Date', 'Title', 'URL', 'Class', 'Status', 'Subject', 'Description', 'TeacherName', 'TelegramStatus'],
+    [SHEETS.EXAM_SCHEDULES]: ['ExamScheduleID', 'Date', 'TargetClass', 'Title', 'ScheduleDataJSON'],
+    [SHEETS.WEEKLY_SCHEDULES]: ['ScheduleID', 'TargetClass', 'TargetSection', 'ScheduleDataJSON', 'LastUpdated'],
+    [SHEETS.TEACHER_ASSIGNMENTS]: ['TeacherID', 'TeacherName', 'Class', 'Section', 'Subject'],
+    [SHEETS.OBJECTIONS]: ['ObjectionID', 'Date', 'StudentID', 'Subject', 'Content', 'AdminStatus', 'TeacherStatus', 'TeacherID', 'TeacherReply'] // (جديد)
+  };
+
+  let createdCount = 0;
+  let skippedCount = 0;
+  let updatedCount = 0;
+
+  for (const sheetName in schema) {
+    let sheet = ss.getSheetByName(sheetName);
+    const headers = schema[sheetName];
+    
+    if (!sheet) {
+      sheet = ss.insertSheet(sheetName);
+      const headerRange = sheet.getRange(1, 1, 1, headers.length);
+      headerRange.setValues([headers]);
+      headerRange.setFontWeight('bold').setBackground('#eeeeee');
+      sheet.setFrozenRows(1);
+      createdCount++;
+    } else {
+      // (جديد) التحقق من الأعمدة الناقصة وإضافتها
+      const currentHeaders = sheet.getRange(1, 1, 1, sheet.getMaxColumns()).getValues()[0];
+      let headerChanged = false;
+      headers.forEach((header) => {
+        if (!currentHeaders.includes(header)) {
+          sheet.getRange(1, currentHeaders.length + 1).setValue(header);
+          currentHeaders.push(header);
+          headerChanged = true;
+        }
+      });
+      if (headerChanged) {
+        updatedCount++;
+      } else {
+        skippedCount++;
+      }
+    }
+  }
+  
+  prefillTestData_(ss);
+  ui.alert('اكتمل الإعداد!', `تم إنشاء ${createdCount} صفحات جديدة. تم تحديث ${updatedCount} صفحات. تم تخطي ${skippedCount} صفحات موجودة بالفعل.`, ui.ButtonSet.OK);
+}
+
+/**
+ * (جديد) دالة مساعدة لملء البيانات التجريبية
+ */
+function prefillTestData_(ss) {
+  try {
+    const settingsSheet = ss.getSheetByName(SHEETS.SETTINGS);
+    if (settingsSheet && settingsSheet.getLastRow() === 1) { 
+      const settingsData = [
+        ['Term1_Month1_Status', 'مفتوح', 'صلاحية إدخال درجة الشهر الأول (ف1)'], ['Term1_Month2_Status', 'مغلق', 'صلاحية إدخال درجة الشهر الثاني (ف1)'],
+        ['MidYear_Exam_Status', 'مغلق', 'صلاحية إدخال درجة نصف السنة'], ['Term2_Month1_Status', 'مغلق', 'صلاحية إدخال درجة الشهر الأول (ف2)'],
+        ['Term2_Month2_Status', 'مغلق', 'صلاحية إدخال درجة الشهر الثاني (ف2)'], ['Final_Exam_Status', 'مغلق', 'صلاحية إدخال درجة الامتحان النهائي']
+      ];
+      settingsSheet.getRange(2, 1, settingsData.length, settingsData[0].length).setValues(settingsData);
+    }
+    const usersSheet = ss.getSheetByName(SHEETS.USERS);
+    if (usersSheet && usersSheet.getLastRow() === 1) {
+      const usersData = [
+        ['A-001', 'admin@riahi.com', '123456', 'إداري', 'مشرف النظام', 'نشط', '', '', '', '', '', 'لا', 'ADMIN_TELEGRAM_ID'],
+        ['T-001', 'teacher@riahi.com', '123456', 'مدرس', 'أستاذ علي', 'نشط', '', '', '', '', '', 'نعم', 'TEACHER_TELEGRAM_ID'],
+        ['S-001', 'student@riahi.com', '123456', 'طالب', 'الطالب محمد', 'نشط', 'الأول المتوسط', 'أ', 'ولي أمر محمد', '07700000000', '', 'لا', 'STUDENT_TELEGRAM_ID']
+      ];
+      usersSheet.getRange(2, 1, usersData.length, usersData.length > 0 ? usersData[0].length : 0).setValues(usersData);
+    }
+    const assignmentsSheet = ss.getSheetByName(SHEETS.TEACHER_ASSIGNMENTS);
+    if (assignmentsSheet && assignmentsSheet.getLastRow() === 1) {
+      const assignmentsData = [
+        ['T-001', 'أستاذ علي', 'الأول المتوسط', 'أ', 'الرياضيات'], ['T-001', 'أستاذ علي', 'الأول المتوسط', 'أ', 'العلوم']
+      ];
+      assignmentsSheet.getRange(2, 1, assignmentsData.length, assignmentsData[0].length).setValues(assignmentsData);
+    }
+    const weeklySheet = ss.getSheetByName(SHEETS.WEEKLY_SCHEDULES);
+    if (weeklySheet && weeklySheet.getLastRow() === 1) {
+      const scheduleJSON = {"الأحد": {"lesson1": "الرياضيات", "lesson2": "العلوم", "lesson3": "العربي", "lesson4": "الانكليزي", "lesson5": "الاسلامية", "lesson6": "الرياضة"}, "الاثنين": {"lesson1": "الرياضيات", "lesson2": "العلوم", "lesson3": "العربي", "lesson4": "الانكليزي", "lesson5": "الفنية", "lesson6": "الحاسوب"}, "الثلاثاء": {"lesson1": "الرياضيات", "lesson2": "العلوم", "lesson3": "العربي", "lesson4": "الانكليزي", "lesson5": "الاجتماعيات", "lesson6": ""}, "الأربعاء": {"lesson1": "الرياضيات", "lesson2": "العلوم", "lesson3": "العربي", "lesson4": "الانكليزي", "lesson5": "الاسلامية", "lesson6": ""}, "الخميس": {"lesson1": "الرياضيات", "lesson2": "العلوم", "lesson3": "العربي", "lesson4": "الانكليزي", "lesson5": "الاجتماعيات", "lesson6": ""}, "الجمعة": {}, "السبت": {}};
+      const weeklyData = [['WS-001', 'الأول المتوسط', 'أ', JSON.stringify(scheduleJSON), new Date()]];
+      weeklySheet.getRange(2, 1, weeklyData.length, weeklyData[0].length).setValues(weeklyData);
+    }
+  } catch (e) { Logger.log('Error prefilling test data: ' + e.message); }
+}
+
+
+
+// ==========================================================
+//                   الموجه الرئيسي (Router)
+// ==========================================================
+// ==========================================================
+//                   الموجه الرئيسي (Router)
+// ==========================================================
+function doPost(e) {
+  try {
+    const requestData = JSON.parse(e.postData.contents);
+    const { action, payload, userInfo } = requestData;
+
+    // (تحديث أمني صارم) التحقق من التوكن لجميع الطلبات ما عدا تسجيل الدخول
+    if (action !== 'login') {
+      if (!userInfo || !userInfo.userId || !userInfo.token) {
+          return ContentService.createTextOutput(JSON.stringify(errorResponse('جلسة غير صالحة أو غير آمنة، يرجى تسجيل الدخول مجدداً.'))).setMimeType(ContentService.MimeType.JSON);
+      }
+      
+      const usersData = getData_(SHEETS.USERS);
+      const userRow = usersData.find(r => r[0] === userInfo.userId);
+      
+      // التوكن محفوظ في العمود رقم 14 (SessionToken)
+      if (!userRow || userRow[13] !== userInfo.token) { 
+          return ContentService.createTextOutput(JSON.stringify(errorResponse('تم تسجيل الدخول من جهاز آخر أو الجلسة منتهية. يرجى تسجيل الدخول مجدداً.'))).setMimeType(ContentService.MimeType.JSON);
+      }
+    }
+
+    let result;
+    switch (action) {
+      // --- المصادقة ---
+      case 'login': result = handleLogin(payload); break;
+
+      // --- لوحات التحكم ---
+      case 'getStudentDashboard': result = getStudentDashboard(userInfo); break; 
+      case 'getTeacherDashboard': result = getTeacherDashboard(userInfo); break;
+
+      // --- وظائف المدرس ---
+      case 'getStudentsForGrading': result = getStudentsForGrading(payload, userInfo); break;
+      case 'submitGrades': result = submitGrades(payload, userInfo); break;
+      case 'getStudentsForAttendance': result = getStudentsForAttendance(payload); break;
+      case 'recordAbsences': result = recordAbsences(payload, userInfo); break;
+      case 'submitHomework': result = submitHomework(payload, userInfo); break;
+      case 'getExistingEvaluations': result = getExistingEvaluations(payload); break;
+      case 'submitDailyEvaluation': result = submitDailyEvaluation(payload, userInfo); break;
+      case 'addLibraryLink': result = addLibraryLink(payload, userInfo); break;
+
+      // --- وظائف المشرف ---
+      case 'getSystemSettings': result = getSystemSettings(); break;
+      case 'updateSystemSettings': result = updateSystemSettings(payload); break;
+      case 'getUniqueClassesAndSubjects': result = getUniqueClassesAndSubjects(); break;
+      case 'createAnnouncement': result = createAnnouncement(payload, userInfo); break;
+      case 'publishExamSchedule': result = publishExamSchedule(payload); break;
+      case 'publishWeeklySchedule': result = publishWeeklySchedule(payload); break;
+      case 'getWeeklySchedule': result = getWeeklySchedule(payload); break;
+      
+      // --- إدارة المستخدمين ---
+      case 'getAllUsers': result = getAllUsers(); break;
+      case 'getUserDetails': result = getUserDetails(payload); break;
+      case 'updateUser': result = updateUser(payload); break;
+      case 'updateUserPermission': result = updateUserPermission(payload); break; 
+
+      // --- نظام الموافقات ---
+      case 'getPendingGrades': result = getPendingItems(SHEETS.GRADES); break; 
+      case 'getPendingAbsences': result = getPendingItems(SHEETS.ABSENCES); break;
+      case 'getPendingEvaluations': result = getPendingItems(SHEETS.DAILY_EVALUATIONS); break;
+      case 'getPendingHomeworks': result = getPendingItems(SHEETS.HOMEWORK); break;
+      case 'getPendingLibraryLinks': result = getPendingItems(SHEETS.LIBRARY); break;
+      case 'handleApproval': result = handleApproval(payload, userInfo); break;
+
+      // --- التقارير ومتابعة الإرسال ---
+      case 'getStudentEvaluationSummary': result = getStudentEvaluationSummary(payload); break;
+      case 'sendSummaryToTelegram': result = sendSummaryToTelegram(payload); break;
+      case 'getMissingSubmissions': result = getMissingSubmissions(); break;
+      case 'sendSubmissionReminder': result = sendSubmissionReminder(payload); break;
+      case 'getGradesReportBySection': result = getGradesReportBySection(payload); break;
+      case 'getSubmissionStatusReport': result = getSubmissionStatusReport(payload); break;
+      case 'manualSendTelegram': result = manualSendTelegram(payload); break;
+
+      // --- الأرشفة ---
+      case 'archiveStudentGrades': result = archiveStudentGrades(payload); break;
+      case 'getArchivedGrades': result = getArchivedGrades(payload); break;
+
+      // --- نظام الاعتراضات ---
+      case 'submitObjection': result = submitObjection(payload, userInfo); break;
+      case 'getStudentObjections': result = getStudentObjections(userInfo); break;
+      case 'getAdminObjections': result = getAdminObjections(); break;
+      case 'handleAdminObjection': result = handleAdminObjection(payload); break;
+      case 'getTeacherObjections': result = getTeacherObjections(userInfo); break;
+      case 'handleTeacherObjection': result = handleTeacherObjection(payload); break;
+
+      // --- نظام الملف الشخصي ---
+      case 'getMyProfile': result = getMyProfile(userInfo); break;
+      case 'updateMyProfile': result = updateMyProfile(payload, userInfo); break;
+
+      // --- نظام التتبع والإحصائيات (الجديد) ---
+      case 'trackItemView': result = trackItemView(payload, userInfo); break;
+      case 'getAdminAnalytics': result = getAdminAnalytics(); break;
+
+      default: result = errorResponse('إجراء غير معروف: ' + action);
+    }
+    return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    Logger.log('Server Error: ' + error.stack);
+    return ContentService.createTextOutput(JSON.stringify({
+      success: false, message: 'حدث خطأ في الخادم: ' + error.message, stack: error.stack
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// دالة لتشفير كلمات المرور الحالية في الشيت وإضافة عمود التوكن (تُشغل مرة واحدة فقط من المحرر)
+function migratePasswordsToHash() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.USERS);
+  const data = sheet.getDataRange().getValues();
+  
+  // التأكد من وجود عنوان لعمود التوكن
+  sheet.getRange(1, 14).setValue('SessionToken');
+  
+  let updatedCount = 0;
+
+  for (let i = 1; i < data.length; i++) {
+    const plainPassword = String(data[i][2]); // العمود C يحتوي على كلمة المرور
+    
+    // التشفير بـ SHA-256 طوله 64 حرفاً. إذا كان أقل، فهذا يعني أنه غير مشفر بعد
+    if (plainPassword.length !== 64 && plainPassword.trim() !== "") {
+        const rawHash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, plainPassword, Utilities.Charset.UTF_8);
+        let txtHash = '';
+        for (let j = 0; j < rawHash.length; j++) {
+          let hashVal = rawHash[j];
+          if (hashVal < 0) { hashVal += 256; }
+          if (hashVal.toString(16).length == 1) { txtHash += '0'; }
+          txtHash += hashVal.toString(16);
+        }
+        // كتابة كلمة المرور المشفرة فوق الكلمة القديمة
+        sheet.getRange(i + 1, 3).setValue(txtHash);
+        updatedCount++;
+    }
+  }
+  
+  SpreadsheetApp.getUi().alert('اكتمل التحديث!', `تم تشفير كلمات مرور ${updatedCount} مستخدم بنجاح. النظام الآن آمن.`, SpreadsheetApp.getUi().ButtonSet.OK);
+}
+
+function errorResponse(msg, stack = '') {
+  return { success: false, message: msg, stack: stack };
+}
+
+function successResponse(data = {}, msg = 'تمت العملية بنجاح') {
+  return { success: true, message: msg, ...data };
+}
+
+// ==========================================================
+//                   المصادقة
+// ==========================================================
+/**
+ * (محدث) إصلاح مشكلة مقارنة كلمة المرور
+ */
+function handleLogin(payload) {
+  const { email, password } = payload;
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.USERS);
+  const data = sheet.getDataRange().getValues();
+  
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (row[1].toLowerCase() === email.toLowerCase() && String(row[2]) === String(password)) {
+      if (row[5] === 'نشط') {
+        const sessionToken = "TOKEN-" + Utilities.getUuid();
+        sheet.getRange(i + 1, 14).setValue(sessionToken); // حفظ التوكن في العمود N
+
+        return successResponse({
+          user: {
+            userId: row[0], email: row[1], role: row[3], name: row[4],
+            studentClass: row[6], studentSection: row[7], token: sessionToken
+          }
+        }, 'تم تسجيل الدخول بنجاح.');
+      }
+      return errorResponse('الحساب غير نشط.');
+    }
+  }
+  return errorResponse('البريد أو كلمة المرور غير صحيحة.');
+}
+
+// جلب بيانات الملف الشخصي الكاملة من الشيت
+function getMyProfile(userInfo) {
+  const data = getData_(SHEETS.USERS);
+  const userRow = data.find(r => r[0] === userInfo.userId);
+  if (!userRow) return errorResponse('المستخدم غير موجود.');
+
+  // تعتمد هذه الدالة على ترتيب الأعمدة في شيت "المستخدمون"
+  return successResponse({
+    profile: {
+      userId: userRow[0],       // العمود A
+      email: userRow[1],        // العمود B
+      fullName: userRow[4],     // العمود E
+      studentClass: userRow[6], // العمود G
+      studentSection: userRow[7], // العمود H
+      guardianName: userRow[8],  // العمود I
+      guardianPhone: userRow[9], // العمود J
+      studentPhone: userRow[10], // العمود K
+      telegramId: userRow[12],   // العمود M
+      motherName: userRow[14] || '',  // العمود O
+      address: userRow[15] || '',     // العمود P
+      dob: userRow[16] || '',         // العمود Q
+      bloodType: userRow[17] || '',   // العمود R
+      medicalNotes: userRow[18] || '', // العمود S
+      profilePic: userRow[19] || ''    // العمود T (مهم جداً للصورة)
+    }
+  });
+}
+
+// تحديث البيانات في الشيت (بما في ذلك الصورة الشخصية)
+// التحديث الصحيح بناءً على صورة الشيت الأخيرة (العمود N هو التوكن)
+function updateMyProfile(payload, userInfo) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.USERS);
+  const data = sheet.getDataRange().getValues();
+  const rowIndex = data.findIndex(r => r[0] === userInfo.userId);
+
+  if (rowIndex <= 0) return errorResponse('فشل العثور على المستخدم.');
+
+  // تحديث الأعمدة الأساسية
+  sheet.getRange(rowIndex + 1, 5).setValue(payload.fullName);      // العمود E
+  sheet.getRange(rowIndex + 1, 9).setValue(payload.guardianName);  // العمود I
+  sheet.getRange(rowIndex + 1, 10).setValue(payload.guardianPhone);// العمود J
+  sheet.getRange(rowIndex + 1, 11).setValue(payload.studentPhone); // العمود K
+  sheet.getRange(rowIndex + 1, 13).setValue(payload.telegramId);   // العمود M
+
+  // البيانات الإضافية تبدأ بعد التوكن (العمود O رقم 15 وما بعده)
+  sheet.getRange(rowIndex + 1, 15).setValue(payload.motherName);   // العمود O
+  sheet.getRange(rowIndex + 1, 16).setValue(payload.address);      // العمود P
+  sheet.getRange(rowIndex + 1, 17).setValue(payload.dob);          // العمود Q
+  sheet.getRange(rowIndex + 1, 18).setValue(payload.bloodType);    // العمود R
+  sheet.getRange(rowIndex + 1, 19).setValue(payload.medicalNotes); // العمود S
+  sheet.getRange(rowIndex + 1, 20).setValue(payload.profilePicBase64); // العمود T
+
+  // تحديث كلمة المرور إذا تم تغييرها
+  if (payload.newPassword) {
+    sheet.getRange(rowIndex + 1, 3).setValue(payload.newPassword);
+  }
+
+  return successResponse({}, 'تم حفظ بياناتك بنجاح في السجل المدرسي.');
+}
+// ==========================================================
+//                   وظائف التليجرام (محدثة)
+// ==========================================================
+
+/**
+ * (إصلاح المشكلة) دالة إرسال التليجرام
+ */
+function sendTelegramMessage_(chatId, text) {
+  const chatIdStr = String(chatId); // (الإصلاح) تحويل ID إلى نص
+  
+  if (!chatId || !text || chatIdStr.includes("_ID") || chatIdStr.trim() === "") {
+    Logger.log(`Skipped sending to placeholder or empty ID: ${chatIdStr}`);
+    return false;
+  }
+  
+  try {
+    const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+    const payload = { chat_id: chatIdStr, text: text, parse_mode: 'HTML' };
+    const options = { method: 'post', contentType: 'application/json', payload: JSON.stringify(payload), muteHttpExceptions: true };
+    const response = UrlFetchApp.fetch(url, options);
+    const resJson = JSON.parse(response.getContentText());
+    if (!resJson.ok) {
+      Logger.log(`Telegram Error for ${chatIdStr}: ${resJson.description}`);
+    }
+    return resJson.ok;
+  } catch (e) {
+    Logger.log('Telegram Fetch Error: ' + e.message);
+    return false;
+  }
+}
+
+function broadcastToStudents(studentIds, message) {
+  const usersMap = getUsersMap_();
+  let sentCount = 0;
+  studentIds.forEach(studentId => {
+    const telegramId = usersMap.get(studentId)?.telegramId;
+    if (telegramId) {
+      if(sendTelegramMessage_(telegramId, message)) {
+        sentCount++;
+      }
+    }
+  });
+  return sentCount;
+}
+
+/**
+ * (جديد) دالة الإرسال الآلي للواجبات - تعمل عبر مُشغّل (Trigger)
+ */
+function homeworkScheduler() {
+  Logger.log("Running Daily Homework Scheduler...");
+  const homeworkSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.HOMEWORK);
+  const data = homeworkSheet.getDataRange().getValues();
+  const schedulesMap = getSchedulesMap_();
+  
+  let tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowDayName = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'][tomorrow.getDay()];
+  
+  let sentCount = 0;
+  
+  // [5=Status, 8=TelegramStatus, 2=Class, 3=Section, 4=Subject, 6=Content]
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const status = row[5];
+    const telegramStatus = row[8];
+    const hwClass = row[2];
+    const hwSection = row[3];
+    const hwSubject = row[4];
+
+    // إرسال فقط إذا كان "مجدول" و "لم يرسل من قبل"
+    if (status === 'مجدول' && telegramStatus !== 'تم الإرسال آلياً' && telegramStatus !== 'فشل الإرسال الآلي') {
+      
+      const scheduleKey = `${hwClass}-${hwSection}`;
+      const tomorrowSchedule = schedulesMap.get(scheduleKey)?.[tomorrowDayName] || {};
+      
+      let isLessonTomorrow = false;
+      for (let lesson in tomorrowSchedule) {
+        if (tomorrowSchedule[lesson] === hwSubject) {
+          isLessonTomorrow = true;
+          break;
+        }
+      }
+      
+      if (isLessonTomorrow) {
+        const content = row[6];
+        const msg = `🔔 <b>واجب ليوم غد (${tomorrowDayName})</b>\n\n<b>المادة:</b> ${hwSubject}\n<b>الصف:</b> ${hwClass} ${hwSection}\n\n${content}`;
+        
+        const targetStudentIds = findStudentsByClass(hwClass, hwSection);
+        
+        // التحقق إذا كان النشر مطلوباً للتليجرام
+        let isSent = false;
+        if (telegramStatus === 'جاهز للإرسال الآلي') {
+           let count = broadcastToStudents(targetStudentIds, msg);
+           isSent = (count > 0);
+           sentCount += count;
+        }
+        
+        // تحديث الحالة في الشيت (تغيير إلى "منشور" في كل الأحوال)
+        homeworkSheet.getRange(i + 1, 6).setValue('منشور'); // Status -> منشور
+        homeworkSheet.getRange(i + 1, 10).setValue(new Date()); // SentDate
+        
+        if (telegramStatus === 'جاهز للإرسال الآلي') {
+           homeworkSheet.getRange(i + 1, 9).setValue(isSent ? 'تم الإرسال آلياً' : 'فشل الإرسال الآلي'); // TelegramStatus
+        }
+        // إذا كان 'نشر للمنصة فقط'، لا نغير حالة التليجرام
+      }
+    }
+  }
+  Logger.log(`Homework scheduler finished. Sent ${sentCount} messages.`);
+}
+
+
+// ==========================================================
+//                   لوحات التحكم (الطالب والمدرس)
+// ==========================================================
+function getStudentDashboard(userInfo) {
+  const allUsers = getData_(SHEETS.USERS);
+  const student = allUsers.find(r => r[0] === userInfo.userId);
+  if (!student) return errorResponse('لم يتم العثور على بيانات الطالب.');
+  const studentClass = student[6];
+  const studentSection = student[7];
+
+  const filterPublished = (data, classCol, sectionCol, statusCol) => {
+    return data.filter(r => 
+      r[statusCol] === 'منشور' && 
+      (r[classCol] === studentClass || r[classCol] === 'الكل') &&
+      (r[sectionCol] === studentSection || r[sectionCol] === 'الكل' || !r[sectionCol])
+    );
+  };
+  
+  const grades = getData_(SHEETS.GRADES).filter(r => r[1] === userInfo.userId && r[14] === 'منشور');
+  const absences = getData_(SHEETS.ABSENCES).filter(r => r[1] === userInfo.userId && r[5] === 'منشور');
+  const homework = filterPublished(getData_(SHEETS.HOMEWORK), 2, 3, 5);
+  const evaluations = getData_(SHEETS.DAILY_EVALUATIONS).filter(r => r[1] === userInfo.userId && r[10] === 'منشور');
+  const library = filterPublished(getData_(SHEETS.LIBRARY), 4, null, 5);
+  const announcements = getData_(SHEETS.ANNOUNCEMENTS).filter(r => r[3] === 'الكل' || r[3] === 'الطلاب فقط');
+  const examSchedules = getData_(SHEETS.EXAM_SCHEDULES).filter(r => r[2] === studentClass || r[2] === 'الكل');
+  const scheduleRow = getData_(SHEETS.WEEKLY_SCHEDULES).find(r => r[1] === studentClass && r[2] === studentSection);
+  const weeklySchedule = scheduleRow ? JSON.parse(scheduleRow[3]) : null;
+
+  return successResponse({ 
+    data: { 
+      announcements: formatAnnouncements(announcements), grades: formatGrades(grades), absences: formatAbsences(absences),
+      homework: formatHomework(homework), evaluations: formatEvaluations(evaluations), library: formatLibrary(library),
+      weeklySchedule: weeklySchedule, examSchedules: formatExamSchedules(examSchedules)
+    } 
+  });
+}
+
+function getTeacherDashboard(userInfo) {
+  const allUsers = getData_(SHEETS.USERS);
+  const teacher = allUsers.find(r => r[0] === userInfo.userId);
+  const announcements = getData_(SHEETS.ANNOUNCEMENTS).filter(r => r[3] === 'الكل' || r[3] === 'المدرسين فقط');
+  const weeklySchedules = getData_(SHEETS.WEEKLY_SCHEDULES).map(r => ({
+      targetClass: r[1], targetSection: r[2], scheduleData: JSON.parse(r[3])
+  }));
+  
+  const assignments = getData_(SHEETS.TEACHER_ASSIGNMENTS);
+  const teacherAssignments = assignments.filter(a => a[0] === userInfo.userId);
+  
+  const teacherClasses = [...new Set(teacherAssignments.map(a => a[2]))];
+  const teacherSections = [...new Set(teacherAssignments.map(a => a[3]))];
+  const teacherSubjects = [...new Set(teacherAssignments.map(a => a[4]))];
+
+  const teacherData = {
+      classes: teacherClasses.length > 0 ? teacherClasses : [],
+      sections: teacherSections.length > 0 ? teacherSections : [],
+      subjects: teacherSubjects.length > 0 ? teacherSubjects : [],
+      announcements: formatAnnouncements(announcements),
+      canRecordAbsence: teacher[11] === 'نعم',
+      weeklySchedules: weeklySchedules.filter(s => teacherClasses.includes(s.targetClass) && (teacherSections.includes(s.targetSection) || teacherSections.length === 0)) // (إصلاح) السماح للمدرس برؤية الجدول حتى لو لم يكن مسنداً لشعبة
+  };
+
+  return successResponse({ data: teacherData });
+}
+
+// ==========================================================
+//                   وظائف المدرس (محدثة)
+// ==========================================================
+function getStudentsForGrading(payload, userInfo) {
+  const { studentClass, studentSection, subject } = payload;
+  const settings = getSystemSettings().settings;
+  const allUsers = getData_(SHEETS.USERS);
+  const students = allUsers.filter(row => row[3] === 'طالب' && row[5] === 'نشط' && row[6] === studentClass && row[7] === studentSection)
+                           .map(row => ({ studentId: row[0], name: row[4] }));
+  if (students.length === 0) return errorResponse('لا يوجد طلاب.');
+  const allGrades = getData_(SHEETS.GRADES);
+  const grades = {};
+  students.forEach(s => {
+    const studentGrades = allGrades.filter(r => r[1] === s.studentId && r[2] === subject);
+    if (studentGrades.length > 0) {
+      grades[s.studentId] = {};
+      studentGrades.forEach(g => {
+        grades[s.studentId][g[3]] = { grade: g[4], status: g[14], recordId: g[0] };
+      });
+    }
+  });
+  return successResponse({ students, grades, settings });
+}
+
+function submitGrades(payload, userInfo) {
+  const { subject, grades } = payload;
+  const settings = getSystemSettings().settings;
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.GRADES);
+  const data = sheet.getDataRange().getValues();
+  const usersMap = getUsersMap_();
+  const teacherName = usersMap.get(userInfo.userId)?.name || userInfo.name;
+  let newRows = [];
+  let updateLogs = [];
+  for (const studentGrade of grades) {
+    const studentId = studentGrade.studentId;
+    for (const gradeType of Object.keys(studentGrade.grades)) {
+      const newValue = studentGrade.grades[gradeType];
+      const settingKey = `${gradeType}_Status`;
+      if (settings[settingKey] && settings[settingKey].value === 'مغلق') continue;
+      let existingRowIndex = data.findIndex(r => r[1] === studentId && r[2] === subject && r[3] === gradeType);
+      if (existingRowIndex > 0) {
+        const oldRow = data[existingRowIndex];
+        const oldValue = oldRow[4];
+        const oldStatus = oldRow[14];
+        if (oldValue != newValue || (oldStatus !== 'موافق عليه' && oldStatus !== 'منشور')) {
+          updateLogs.push({ row: existingRowIndex + 1, grade: newValue, status: 'بانتظار الموافقة', changes: JSON.stringify({ old: oldValue, new: newValue }), teacher: teacherName, teacherId: userInfo.userId });
+        }
+      } else {
+        newRows.push([
+          "GRD-" + new Date().getTime() + Math.random(), studentId, subject, gradeType, newValue, '', '', '', '', '', '', '', 
+          new Date(), userInfo.userId, 'بانتظار الموافقة', JSON.stringify({ old: '', new: newValue }), teacherName, ''
+        ]);
+      }
+    }
+  }
+  updateLogs.forEach(log => {
+    sheet.getRange(log.row, 5).setValue(log.grade); 
+    sheet.getRange(log.row, 13, 1, 5).setValues([[new Date(), log.teacherId, log.status, log.changes, log.teacher]]);
+  });
+  if (newRows.length > 0) {
+    sheet.getRange(sheet.getLastRow() + 1, 1, newRows.length, newRows[0].length).setValues(newRows);
+  }
+  if (newRows.length === 0 && updateLogs.length === 0) {
+    return errorResponse('لم يتم حفظ أي درجات، قد تكون جميع الحقول التي أدخلتها مغلقة من قبل الإدارة.');
+  }
+  return successResponse({}, 'تم إرسال الدرجات للمراجعة.');
+}
+
+function getExistingEvaluations(payload) {
+  const { date, subject, studentIds } = payload;
+  const data = getData_(SHEETS.DAILY_EVALUATIONS);
+  const normalizedDate = new Date(date).toLocaleDateString();
+  const existing = data.filter(r => 
+    new Date(r[3]).toLocaleDateString() === normalizedDate && r[4] === subject && studentIds.includes(r[1])
+  );
+  const evaluations = existing.map(r => ({
+    evaluationId: r[0], studentId: r[1],
+    daily_prep: r[5], participation: r[6], behavior: r[7], homework: r[8],
+    note: r[9], status: r[10]
+  }));
+  return successResponse({ evaluations });
+}
+
+function submitDailyEvaluation(payload, userInfo) {
+  const { evaluations, date, subject } = payload;
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.DAILY_EVALUATIONS);
+  const data = sheet.getDataRange().getValues();
+  const teacherName = getUsersMap_().get(userInfo.userId)?.name || userInfo.name;
+  let newRows = [];
+  let updateLogs = [];
+  evaluations.forEach(ev => {
+    const newStatus = 'بانتظار الموافقة'; 
+    if (ev.evaluationId) {
+      let rowIndex = data.findIndex(r => r[0] === ev.evaluationId);
+      if (rowIndex > 0) {
+        updateLogs.push({
+          row: rowIndex + 1,
+          values: [ ev.evaluations.DailyPrep || '', ev.evaluations.Participation || '', ev.evaluations.Behavior || '', ev.evaluations.Homework || '', ev.note || '', newStatus ]
+        });
+      }
+    } else { 
+      newRows.push([
+        "EV-" + new Date().getTime() + Math.random(), ev.studentId, userInfo.userId, new Date(date), subject,
+        ev.evaluations.DailyPrep || '', ev.evaluations.Participation || '', ev.evaluations.Behavior || '', ev.evaluations.Homework || '',
+        ev.note || '', newStatus, teacherName, ''
+      ]);
+    }
+  });
+  updateLogs.forEach(log => { sheet.getRange(log.row, 6, 1, 6).setValues([log.values]); });
+  if (newRows.length > 0) { sheet.getRange(sheet.getLastRow() + 1, 1, newRows.length, newRows[0].length).setValues(newRows); }
+  return successResponse({}, 'تم إرسال التقييمات للمراجعة.');
+}
+
+function getStudentsForAttendance(payload) {
+  const { studentClass, studentSection } = payload;
+  const allUsers = getData_(SHEETS.USERS);
+  const students = allUsers.filter(row => row[3] === 'طالب' && row[5] === 'نشط' && row[6] === studentClass && row[7] === studentSection)
+                           .map(row => ({ studentId: row[0], name: row[4] }));
+  return successResponse({ students });
+}
+
+function recordAbsences(payload, userInfo) {
+  const { date, studentIds, notes } = payload;
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.ABSENCES);
+  const teacherName = getUsersMap_().get(userInfo.userId)?.name || userInfo.name;
+  const newRows = studentIds.map(studentId => {
+    return [ "ABS-" + new Date().getTime() + Math.random(), studentId, new Date(date), notes || '', teacherName, 'بانتظار الموافقة', '' ];
+  });
+  if (newRows.length > 0) { sheet.getRange(sheet.getLastRow() + 1, 1, newRows.length, newRows[0].length).setValues(newRows); }
+  return successResponse({}, 'تم إرسال الغيابات للمراجعة.');
+}
+
+// (محدث - لا يأخذ تاريخ، فقط المحتوى)
+function submitHomework(payload, userInfo) {
+  const { content, targetClass, targetSection, targetSubject } = payload; 
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.HOMEWORK);
+  const teacherName = getUsersMap_().get(userInfo.userId)?.name || userInfo.name;
+  
+  // [0=ID, 1=SubmitDate, 2=Class, 3=Section, 4=Subject, 5=Status, 6=Content, 7=TchName, 8=TlgStatus, 9=SentDate]
+  const newRow = [
+    "HW-" + new Date().getTime() + Math.random(), // 0
+    new Date(), targetClass, targetSection, targetSubject, // 1, 2, 3, 4
+    'بانتظار الموافقة', content, teacherName, '', '' // 5, 6, 7, 8, 9
+  ];
+  
+  sheet.appendRow(newRow);
+  return successResponse({}, 'تم إرسال الواجب للمراجعة.');
+}
+
+function addLibraryLink(payload, userInfo) {
+  const { title, url, description, targetClass, targetSubject } = payload;
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.LIBRARY);
+  const teacherName = getUsersMap_().get(userInfo.userId)?.name || userInfo.name;
+  const newRow = [
+    "LIB-" + new Date().getTime() + Math.random(), new Date(), title, url, targetClass,
+    'بانتظار الموافقة', targetSubject, description, teacherName, ''
+  ];
+  sheet.appendRow(newRow);
+  return successResponse({}, 'تم إرسال الرابط للمراجعة.');
+}
+
+
+// ==========================================================
+//                   وظائف المشرف (محدثة بالكامل)
+// ==========================================================
+
+// --- 1. إدارة المستخدمين (جديد) ---
+function getAllUsers() {
+  const data = getData_(SHEETS.USERS);
+  const users = data.map(user => ({
+    userId: user[0],
+    fullName: user[4],
+    role: user[3],
+    status: user[5],
+    telegramId: user[12],
+    canRecordAbsence: user[11] === 'نعم' // (جديد) إرسال الصلاحية للواجهة
+  }));
+  return successResponse({ users });
+}
+
+function getUserDetails(payload) {
+  const { userId } = payload;
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.USERS);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const rowIndex = data.findIndex(r => r[0] == userId);
+  
+  if (rowIndex > 0) {
+    return successResponse({ headers: headers, userData: data[rowIndex] });
+  } else {
+    return errorResponse('لم يتم العثور على المستخدم.');
+  }
+}
+
+function updateUser(payload) {
+  const { userId, newRowData } = payload;
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.USERS);
+  const data = sheet.getDataRange().getValues();
+  const rowIndex = data.findIndex(r => r[0] == userId);
+  
+  if (rowIndex > 0) {
+    sheet.getRange(rowIndex + 1, 1, 1, newRowData.length).setValues([newRowData]);
+    return successResponse({}, 'تم تحديث بيانات المستخدم بنجاح.');
+  } else {
+    return errorResponse('لم يتم العثور على المستخدم.');
+  }
+}
+
+// (جديد) دالة آمنة لتحديث صلاحية واحدة فقط
+function updateUserPermission(payload) {
+  const { userId, permission, value } = payload;
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.USERS);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const rowIndex = data.findIndex(r => r[0] == userId);
+  
+  let colIndex = -1;
+  if (permission === 'canRecordAbsence') {
+    colIndex = headers.indexOf('CanRecordAbsence');
+  }
+  
+  if (rowIndex > 0 && colIndex > -1) {
+    const newValue = value ? 'نعم' : 'لا';
+    sheet.getRange(rowIndex + 1, colIndex + 1).setValue(newValue);
+    return successResponse({}, 'تم تحديث الصلاحية.');
+  } else {
+    return errorResponse('لم يتم العثور على المستخدم أو الصلاحية.');
+  }
+}
+
+// --- 2. نظام الموافقات الشامل (محدث) ---
+function getPendingItems(sheetName) {
+  const usersMap = getUsersMap_();
+  const data = getData_(sheetName);
+  let items = [];
+  try {
+    if (sheetName === SHEETS.GRADES) {
+      items = data.filter(r => r[14] === 'بانتظار الموافقة').map(r => ({
+        id: r[0], studentName: usersMap.get(r[1])?.name || r[1],
+        subject: r[2], gradeType: r[3],
+        changes: JSON.parse(r[15] || '{}'), teacher: r[16] // (إصلاح) إضافة معالجة للـ JSON الفارغ
+      }));
+    } else if (sheetName === SHEETS.ABSENCES) {
+      items = data.filter(r => r[5] === 'بانتظار الموافقة').map(r => ({
+        id: r[0], studentName: usersMap.get(r[1])?.name || r[1],
+        date: r[2], notes: r[3], teacher: r[4]
+      }));
+    } else if (sheetName === SHEETS.DAILY_EVALUATIONS) {
+      items = data.filter(r => r[10] === 'بانتظار الموافقة').map(r => ({
+        id: r[0], studentName: usersMap.get(r[1])?.name || r[1], subject: r[4], date: r[3],
+        data: { daily_prep: r[5], participation: r[6], behavior: r[7], homework: r[8], note: r[9] },
+        teacher: r[11]
+      }));
+    } else if (sheetName === SHEETS.HOMEWORK) {
+      items = data.filter(r => r[5] === 'بانتظار الموافقة').map(r => ({
+        id: r[0], date: r[1], class: r[2], section: r[3], subject: r[4], content: r[6], teacher: r[7]
+      }));
+    } else if (sheetName === SHEETS.LIBRARY) {
+      items = data.filter(r => r[5] === 'بانتظار الموافقة').map(r => ({
+        id: r[0], date: r[1], title: r[2], url: r[3], class: r[4], subject: r[6], teacher: r[8]
+      }));
+    }
+  } catch (e) {
+    Logger.log(`Error parsing pending items for ${sheetName}: ${e.message}`);
+    return errorResponse(`حدث خطأ أثناء جلب البيانات لـ ${sheetName}.`);
+  }
+  return successResponse({ items });
+}
+
+function handleApproval(payload, userInfo) {
+  // (محدث بالكامل - تم إصلاح خطأ التليجرام + تعديل منطق الواجبات)
+  const { itemIds, action, sendTelegram, sheetName } = payload;
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) return errorResponse(`Sheet ${sheetName} not found.`);
+  
+  const range = sheet.getDataRange();
+  const values = range.getValues();
+  const usersMap = getUsersMap_();
+
+  let newStatus;
+  if (action === 'approve') newStatus = 'موافق عليه';
+  else if (action === 'publish') {
+    // (تعديل منطق الواجبات)
+    newStatus = (sheetName === SHEETS.HOMEWORK) ? 'مجدول' : 'منشور';
+  }
+  else if (action === 'reject') newStatus = 'مرفوض';
+  else return errorResponse('إجراء غير معروف.');
+
+  let telegramStatusCol = -1;
+  let statusCol = -1;
+  let sentCount = 0;
+
+  if (sheetName === SHEETS.GRADES) { statusCol = 14; telegramStatusCol = 17; }
+  else if (sheetName === SHEETS.ABSENCES) { statusCol = 5; telegramStatusCol = 6; }
+  else if (sheetName === SHEETS.DAILY_EVALUATIONS) { statusCol = 10; telegramStatusCol = 12; }
+  else if (sheetName === SHEETS.HOMEWORK) { statusCol = 5; telegramStatusCol = 8; }
+  else if (sheetName === SHEETS.LIBRARY) { statusCol = 5; telegramStatusCol = 9; }
+  else return errorResponse('اسم ورقة غير مدعوم للموافقة.');
+
+  itemIds.forEach(id => {
+    const rowIndex = values.findIndex(r => r[0] === id);
+    if (rowIndex > 0) {
+      const rowData = values[rowIndex];
+      // 1. تحديث الحالة
+      sheet.getRange(rowIndex + 1, statusCol + 1).setValue(newStatus);
+      
+      let sendNow = (action === 'publish' && sendTelegram);
+      
+      // لا ترسل الواجبات فوراً، الدالة الآلية هي المسؤولة
+      if (sheetName === SHEETS.HOMEWORK) {
+        sendNow = false; 
+        if (newStatus === 'مجدول' && sendTelegram) { // (إذا طلب الإرسال، سيسجل أنه جاهز للإرسال الآلي)
+            sheet.getRange(rowIndex + 1, telegramStatusCol + 1).setValue('جاهز للإرسال الآلي');
+        } else if (newStatus === 'مجدول' && !sendTelegram) {
+            sheet.getRange(rowIndex + 1, telegramStatusCol + 1).setValue('نشر للمنصة فقط'); // (سينشر على المنصة آلياً أيضاً)
+        }
+      }
+
+      if (sendNow) {
+        let msg = '';
+        let studentId = '';
+        let targetStudentIds = [];
+
+        try {
+          if (sheetName === SHEETS.GRADES) {
+             studentId = rowData[1];
+             msg = `🔔 <b>إشعار درجة</b>\n\nتم نشر درجة جديدة للطالب/ة <b>${usersMap.get(studentId)?.name}</b>\nالمادة: ${rowData[2]}\nالدرجة: ${rowData[3]} = ${rowData[4]}`;
+          } else if (sheetName === SHEETS.ABSENCES) {
+            studentId = rowData[1];
+            msg = `🔔 <b>إشعار غياب</b>\n\nتم تسجيل غياب للطالب/ة <b>${usersMap.get(studentId)?.name}</b>\nبتاريخ: ${new Date(rowData[2]).toLocaleDateString('ar-IQ')}\nملاحظات: ${rowData[3] || 'لا يوجد'}`;
+          } else if (sheetName === SHEETS.DAILY_EVALUATIONS) {
+            studentId = rowData[1];
+            msg = formatEvaluationMessage_(usersMap.get(studentId)?.name, rowData[4], rowData[3], { DailyPrep: rowData[5], Participation: rowData[6], Behavior: rowData[7], Homework: rowData[8] }, rowData[9], rowData[11]);
+          } else if (sheetName === SHEETS.LIBRARY) {
+            msg = `📚 <b>مادة جديدة في المكتبة</b>\n\n<b>المادة:</b> ${rowData[6]}\n<b>العنوان:</b> ${rowData[2]}\n\n<a href="${rowData[3]}">اضغط هنا لفتح الرابط</a>`;
+            targetStudentIds = findStudentsByClass(rowData[4], 'الكل');
+          }
+        } catch (e) { Logger.log('Error formatting Telegram message: ' + e.message); }
+
+        let isSent = false;
+        if (studentId) {
+          const telegramId = usersMap.get(studentId)?.telegramId;
+          if (telegramId) {
+            isSent = sendTelegramMessage_(telegramId, msg);
+            if (isSent) sentCount++;
+          }
+        } else if (targetStudentIds.length > 0) {
+          let count = broadcastToStudents(targetStudentIds, msg);
+          if (count > 0) { isSent = true; sentCount += count; }
+        }
+        
+        if (telegramStatusCol > -1) {
+          let tlgStatus = 'فشل';
+          if (isSent) tlgStatus = 'تم الإرسال';
+          else if (!studentId && targetStudentIds.length === 0) tlgStatus = 'لا مستلمين';
+          else tlgStatus = 'لا يوجد معرف';
+          sheet.getRange(rowIndex + 1, telegramStatusCol + 1).setValue(tlgStatus);
+        }
+      }
+    }
+  });
+
+  let msg = `تم تحديث ${itemIds.length} سجل إلى "${newStatus}".`;
+  if (sentCount > 0) msg += ` وتم إرسال ${sentCount} إشعار تليجرام.`;
+  if (newStatus === 'مجدول') msg = `تمت جدولة ${itemIds.length} واجب. سيتم إرسالها آلياً قبل يوم الحصة.`;
+  
+  return successResponse({}, msg);
+}
+
+
+// --- 3. تقارير المشرف الجديدة ---
+
+// (تقرير خلاصة التقييمات - محدث)
+function getStudentEvaluationSummary(payload) {
+  const { studentId, startDate, endDate } = payload;
+  const data = getData_(SHEETS.DAILY_EVALUATIONS);
+  
+  const studentEvals = data.filter(r => 
+    r[1] === studentId && (r[10] === 'موافق عليه' || r[10] === 'منشور') &&
+    new Date(r[3]) >= new Date(startDate) && new Date(r[3]) <= new Date(endDate)
+  );
+
+  if (studentEvals.length === 0) {
+    return errorResponse('لا توجد تقييمات معتمدة لهذا الطالب ضمن الفترة المحددة.');
+  }
+
+  // (تنسيق الخلاصة بشكل مرتب)
+  let summary = {
+    total: studentEvals.length,
+    bySubject: {},
+    byType: { 
+      'تحضير يومي': { 'جيد': 0, 'متوسط': 0, 'ضعيف': 0, 'ناقص': 0, total: 0 }, 
+      'مشاركة': { 'جيد': 0, 'متوسط': 0, 'ضعيف': 0, 'ناقص': 0, total: 0 }, 
+      'سلوك': { 'جيد': 0, 'متوسط': 0, 'ضعيف': 0, 'ناقص': 0, total: 0 }, 
+      'واجب بيتي': { 'جيد': 0, 'متوسط': 0, 'ضعيف': 0, 'ناقص': 0, total: 0 } 
+    },
+    notes: []
+  };
+  const typeKeys = {'تحضير يومي': 5, 'مشاركة': 6, 'سلوك': 7, 'واجب بيتي': 8};
+
+  studentEvals.forEach(r => {
+    const subject = r[4];
+    if (!summary.bySubject[subject]) summary.bySubject[subject] = 0;
+    summary.bySubject[subject]++;
+    
+    for (const typeName in typeKeys) {
+      const evalValue = r[typeKeys[typeName]];
+      if (evalValue && summary.byType[typeName].hasOwnProperty(evalValue)) {
+        summary.byType[typeName][evalValue]++;
+        summary.byType[typeName].total++;
+      } else if (!evalValue) {
+        summary.byType[typeName]['ناقص']++;
+      }
+    }
+    if (r[9]) summary.notes.push(`[${new Date(r[3]).toLocaleDateString('ar-IQ')} - ${subject}]: ${r[9]}`);
+  });
+  
+  // (جديد) تنسيق النص للواجهة
+  let summaryText = `خلاصة تقييمات الطالب (من ${startDate} إلى ${endDate})\n`;
+  summaryText += `=============================\n`;
+  summaryText += `إجمالي التقييمات المستلمة: ${summary.total}\n\n`;
+  
+  summaryText += `--- ملخص حسب المادة ---\n`;
+  for (const subject in summary.bySubject) {
+      summaryText += `- ${subject}: ${summary.bySubject[subject]} تقييم\n`;
+  }
+  
+  summaryText += `\n--- ملخص حسب النوع ---\n`;
+  for (const typeName in summary.byType) {
+    const stats = summary.byType[typeName];
+    summaryText += `${typeName} (إجمالي ${stats.total}):\n`;
+    summaryText += `  جيد: ${stats['جيد']} | متوسط: ${stats['متوسط']} | ضعيف: ${stats['ضعيف']} | ناقص: ${stats['ناقص']}\n`;
+  }
+  
+  summaryText += `\n--- الملاحظات المسجلة (${summary.notes.length}) ---\n`;
+  summary.notes.forEach(note => {
+      summaryText += `- ${note}\n`;
+  });
+
+  return successResponse({ summary, details: formatEvaluations(studentEvals), summaryText: summaryText });
+}
+
+function sendSummaryToTelegram(payload) {
+  const { studentId, summaryText } = payload;
+  const user = getUsersMap_().get(studentId);
+  if (!user) return errorResponse('لم يتم العثور على الطالب.');
+  if (!user.telegramId) return errorResponse('لا يمتلك ولي أمر الطالب معرف تليجرام مسجل.');
+  const studentName = user.name;
+  const header = `📋 <b>خلاصة التقييمات للطالب/ة: ${studentName}</b>\n\n`;
+  if(sendTelegramMessage_(user.telegramId, header + summaryText)) {
+    return successResponse({}, 'تم إرسال الخلاصة إلى ولي الأمر بنجاح.');
+  } else {
+    return errorResponse('فشل إرسال الرسالة عبر تليجرام.');
+  }
+}
+
+// (تقرير المدرسين المقصرين - محدث لآخر 7 أيام)
+function getMissingSubmissions() {
+  const assignments = getData_(SHEETS.TEACHER_ASSIGNMENTS);
+  const schedulesMap = getSchedulesMap_();
+  
+  const evalsData = getData_(SHEETS.DAILY_EVALUATIONS);
+  const hwData = getData_(SHEETS.HOMEWORK);
+  
+  const dayNames = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+  let missesByTeacher = {};
+
+  // التحقق من آخر 7 أيام (باستثناء اليوم)
+  for (let i = 1; i <= 7; i++) {
+    let date = new Date();
+    date.setDate(date.getDate() - i);
+    const dateStr = date.toLocaleDateString();
+    const dayName = dayNames[date.getDay()];
+
+    if (dayName === 'الجمعة' || dayName === 'السبت') continue;
+
+    let expectedSubmissions = [];
+    assignments.forEach(a => {
+      const [teacherId, teacherName, className, sectionName, subject] = a;
+      const scheduleKey = `${className}-${sectionName}`;
+      const dayLessons = schedulesMap.get(scheduleKey)?.[dayName] || {};
+      
+      let hasLesson = false;
+      for(const lesson in dayLessons) {
+        if(dayLessons[lesson] === subject) {
+          hasLesson = true;
+          break;
+        }
+      }
+      
+      if(hasLesson) {
+        expectedSubmissions.push({ class: className, section: sectionName, subject: subject, teacherId: teacherId, teacherName: teacherName });
+      }
+    });
+
+    const uniqueExpected = [...new Map(expectedSubmissions.map(item => [item.teacherId + item.class + item.section + item.subject, item])).values()];
+
+    uniqueExpected.forEach(exp => {
+      const evalFound = evalsData.some(ev => 
+        ev[2] === exp.teacherId && ev[4] === exp.subject && new Date(ev[3]).toLocaleDateString() === dateStr
+      );
+      // (ملاحظة: هذا يفترض أن المدرس يرسل الواجب في نفس يوم الحصة)
+      const hwFound = hwData.some(hw => 
+        hw[7] === exp.teacherName && hw[2] === exp.class && hw[3] === exp.section && hw[4] === exp.subject && new Date(hw[1]).toLocaleDateString() === dateStr
+      );
+
+      if (!evalFound || !hwFound) {
+        if (!missesByTeacher[exp.teacherId]) {
+          missesByTeacher[exp.teacherId] = { teacherId: exp.teacherId, teacherName: exp.teacherName, evalMisses: 0, hwMisses: 0, details: [] };
+        }
+        if (!evalFound) {
+          missesByTeacher[exp.teacherId].evalMisses++;
+          missesByTeacher[exp.teacherId].details.push(`تقييم ${exp.subject} (${exp.class} ${exp.section}) يوم ${dayName}`);
+        }
+        if (!hwFound) {
+          missesByTeacher[exp.teacherId].hwMisses++;
+          missesByTeacher[exp.teacherId].details.push(`واجب ${exp.subject} (${exp.class} ${exp.section}) يوم ${dayName}`);
+        }
+      }
+    });
+  }
+
+  return successResponse({ report: missesByTeacher });
+}
+
+
+function sendSubmissionReminder(payload) {
+  const { teacherId, message } = payload;
+  const user = getUsersMap_().get(teacherId);
+  if (!user) return errorResponse('لم يتم العثور على المدرس.');
+  if (!user.telegramId) return errorResponse('المدرس لا يمتلك معرف تليجرام مسجل.');
+  const header = "🔔 <b>تذكير من الإدارة</b> 🔔\n\n";
+  if(sendTelegramMessage_(user.telegramId, header + message)) {
+    return successResponse({}, 'تم إرسال التذكير للمدرس بنجاح.');
+  } else {
+    return errorResponse('فشل إرسال التذكير.');
+  }
+}
+
+function getGradesReportBySection(payload) {
+  const { studentClass, studentSection } = payload;
+  const allUsers = getData_(SHEETS.USERS);
+  const students = allUsers.filter(row => row[3] === 'طالب' && row[5] === 'نشط' && row[6] === studentClass && row[7] === studentSection);
+  const studentIds = students.map(s => s[0]);
+  const allGrades = getData_(SHEETS.GRADES);
+  const approvedGrades = allGrades.filter(r => 
+    studentIds.includes(r[1]) && (r[14] === 'موافق عليه' || r[14] === 'منشور')
+  );
+  const report = {};
+  students.forEach(s => { report[s[0]] = { studentName: s[4], grades: {} }; });
+  approvedGrades.forEach(g => {
+    const studentId = g[1], subject = g[2], gradeType = g[3], grade = g[4];
+    if (!report[studentId].grades[subject]) { report[studentId].grades[subject] = { subject: subject }; }
+    report[studentId].grades[subject][gradeType] = grade;
+  });
+  return successResponse({ report: Object.values(report) });
+}
+
+// ==========================================================
+//           (جديد) تقارير متابعة الإرسال
+// ==========================================================
+function getSubmissionStatusReport(payload) {
+  const { sheetName } = payload;
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) return errorResponse(`Sheet ${sheetName} not found.`);
+  
+  const data = sheet.getDataRange().getValues().slice(1); //
+  const usersMap = getUsersMap_();
+  let items = [];
+
+  // عرض آخر 50 سجل فقط للسرعة
+  const recentData = data.slice(Math.max(data.length - 50, 0)).reverse();
+
+  if (sheetName === SHEETS.HOMEWORK) {
+    // [7=TeacherName, 2=Class, 3=Section, 4=Subject, 5=Status, 8=TelegramStatus, 0=ID]
+    items = recentData.map(r => ({
+      teacher: r[7],
+      class: `${r[2]} ${r[3]}`,
+      subject: r[4],
+      status: r[5],
+      telegramStatus: r[8] || '(فارغ)',
+      id: r[0]
+    }));
+  } else if (sheetName === SHEETS.DAILY_EVALUATIONS) {
+    // [11=TeacherName, 1=StudentID, 4=Subject, 10=Status, 12=TelegramStatus, 0=ID]
+    items = recentData.map(r => ({
+      teacher: r[11],
+      class: usersMap.get(r[1])?.class || 'N/A',
+      subject: `${r[4]} (لـ ${usersMap.get(r[1])?.name || r[1]})`,
+      status: r[10],
+      telegramStatus: r[12] || '(فارغ)',
+      id: r[0]
+    }));
+  }
+  
+  return successResponse({ items });
+}
+
+function manualSendTelegram(payload) {
+  const { itemId, sheetName } = payload;
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) return errorResponse(`Sheet ${sheetName} not found.`);
+  
+  const range = sheet.getDataRange();
+  const values = range.getValues();
+  const usersMap = getUsersMap_();
+  
+  const rowIndex = values.findIndex(r => r[0] === itemId);
+  if (rowIndex <= 0) return errorResponse('لم يتم العثور على السجل.');
+  
+  const rowData = values[rowIndex];
+  
+  let telegramStatusCol = -1;
+  let msg = '';
+  let studentId = '';
+  let targetStudentIds = [];
+  let isSent = false;
+  let tlgStatus = 'فشل (إرسال يدوي)';
+
+  try {
+    if (sheetName === SHEETS.HOMEWORK) {
+      // [2=Class, 3=Section, 4=Subject, 6=Content, 8=TelegramStatusCol]
+      telegramStatusCol = 8;
+      msg = `🔔 <b>واجب</b>\n\n<b>المادة:</b> ${rowData[4]}\n<b>الصف:</b> ${rowData[2]} ${rowData[3]}\n\n${rowData[6]}`;
+      targetStudentIds = findStudentsByClass(rowData[2], rowData[3]);
+      
+    } else if (sheetName === SHEETS.DAILY_EVALUATIONS) {
+      // [1=StudentID, 4=Subject, 3=Date, 5-9=Evals, 11=TeacherName, 12=TelegramStatusCol]
+      telegramStatusCol = 12;
+      studentId = rowData[1];
+      msg = formatEvaluationMessage_(usersMap.get(studentId)?.name, rowData[4], rowData[3], { DailyPrep: rowData[5], Participation: rowData[6], Behavior: rowData[7], Homework: rowData[8] }, rowData[9], rowData[11]);
+    }
+  } catch (e) { 
+    Logger.log('Error formatting manual Telegram message: ' + e.message);
+    return errorResponse('خطأ في تنسيق الرسالة.');
+  }
+
+  if (studentId) {
+    const telegramId = usersMap.get(studentId)?.telegramId;
+    if (telegramId) {
+      isSent = sendTelegramMessage_(telegramId, msg);
+    }
+  } else if (targetStudentIds.length > 0) {
+    let count = broadcastToStudents(targetStudentIds, msg);
+    if (count > 0) { isSent = true; }
+  }
+
+  if (isSent) tlgStatus = 'تم الإرسال (يدوي)';
+  
+  if (telegramStatusCol > -1) {
+    sheet.getRange(rowIndex + 1, telegramStatusCol + 1).setValue(tlgStatus);
+  }
+  
+  return isSent ? successResponse({}, 'تم الإرسال اليدوي بنجاح.') : errorResponse('فشل الإرسال اليدوي.');
+}
+
+
+// ==========================================================
+//                   إدارة الإعدادات والجداول والأرشفة
+// ==========================================================
+function getSystemSettings() {
+  const data = getData_(SHEETS.SETTINGS);
+  const settings = {};
+  data.forEach(row => { settings[row[0]] = { value: row[1], description: row[2] }; });
+  return successResponse({ settings });
+}
+
+function updateSystemSettings(payload) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.SETTINGS);
+  const data = sheet.getDataRange().getValues();
+  const keys = Object.keys(payload);
+  for (let i = 1; i < data.length; i++) {
+    if (keys.includes(data[i][0])) { sheet.getRange(i + 1, 2).setValue(payload[data[i][0]]); }
+  }
+  return successResponse({}, 'تم تحديث الإعدادات.');
+}
+
+function createAnnouncement(payload, userInfo) {
+  const { title, content, audience, sendTelegram } = payload;
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.ANNOUNCEMENTS);
+  sheet.appendRow([ "ANN-" + new Date().getTime() + Math.random(), new Date(), title, audience, content, userInfo.name ]);
+  let sentCount = 0;
+  if (sendTelegram) {
+    const usersMap = getUsersMap_();
+    let targetRole = (audience === 'الطلاب فقط') ? 'طالب' : (audience === 'المدرسين فقط') ? 'مدرس' : '';
+    const targetStudentIds = Array.from(usersMap.entries())
+      .filter(([userId, data]) => audience === 'الكل' || data.role === targetRole)
+      .map(([userId, data]) => userId); 
+    const telegramMsg = `📢 <b>إعلان من الإدارة</b> 📢\n\n<b>${title}</b>\n\n${content}`;
+    sentCount = broadcastToStudents(targetStudentIds, telegramMsg);
+  }
+  let msg = 'تم نشر الإعلان بنجاح.';
+  if (sentCount > 0) msg += ` وتم إرساله إلى ${sentCount} مستخدم عبر تليجرام.`;
+  return successResponse({}, msg);
+}
+
+function publishExamSchedule(payload) {
+  const { title, targetClass, scheduleData } = payload;
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.EXAM_SCHEDULES);
+  sheet.appendRow([ "EXAM-" + new Date().getTime() + Math.random(), new Date(), targetClass, title, JSON.stringify(scheduleData) ]);
+  return successResponse({}, 'تم نشر جدول الامتحانات بنجاح.');
+}
+
+function publishWeeklySchedule(payload) {
+    const { targetClass, targetSection, scheduleData } = payload;
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.WEEKLY_SCHEDULES);
+    const data = sheet.getDataRange().getValues();
+    let existingRowIndex = -1;
+    for (let i = 1; i < data.length; i++) {
+        if (data[i][1] === targetClass && data[i][2] === targetSection) { existingRowIndex = i + 1; break; }
+    }
+    if (existingRowIndex > 0) {
+        sheet.getRange(existingRowIndex, 4).setValue(JSON.stringify(scheduleData));
+        return successResponse({}, 'تم تحديث الجدول الأسبوعي بنجاح.');
+    } else {
+        sheet.appendRow([ "WS-" + new Date().getTime() + Math.random(), targetClass, targetSection, JSON.stringify(scheduleData), new Date() ]);
+        return successResponse({}, 'تم نشر الجدول الأسبوعي بنجاح.');
+    }
+}
+
+function getWeeklySchedule(payload) {
+    const { targetClass, targetSection } = payload;
+    const data = getData_(SHEETS.WEEKLY_SCHEDULES);
+    const scheduleRow = data.find(r => r[1] === targetClass && r[2] === targetSection);
+    if (scheduleRow) {
+        return successResponse({ schedule: JSON.parse(scheduleRow[3]) });
+    } else {
+        return errorResponse('لم يتم العثور على جدول.');
+    }
+}
+
+function getUniqueClassesAndSubjects() {
+    const assignments = getData_(SHEETS.TEACHER_ASSIGNMENTS);
+    const classes = [...new Set(assignments.map(a => a[2]))];
+    const sections = [...new Set(assignments.map(a => a[3]))];
+    const subjects = [...new Set(assignments.map(a => a[4]))];
+    if (classes.length === 0) {
+      return successResponse({
+        classes: ['الأول المتوسط', 'الثاني المتوسط', 'الثالث المتوسط'],
+        sections: ['أ', 'ب', 'ج', 'د'],
+        subjects: ['الاسلامية', 'العربي', 'الانكليزي', 'الرياضيات', 'الاجتماعيات', 'العلوم', 'الفيزياء', 'الكيمياء', 'الحاسوب', 'الفنية', 'الرياضة']
+      });
+    }
+    return successResponse({ classes, sections, subjects });
+}
+
+function archiveStudentGrades(payload) {
+  const { studentId } = payload;
+  const gradesSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.GRADES);
+  const gradesData = gradesSheet.getDataRange().getValues();
+  const archiveSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.GRADES_ARCHIVE);
+  if (!archiveSheet) return errorResponse('ورقة الأرشيف غير موجودة.');
+  if (archiveSheet.getLastRow() === 0) { archiveSheet.appendRow(gradesData[0]); }
+  const rowsToArchive = [];
+  const rowsToDelete = []; 
+  for (let i = 1; i < gradesData.length; i++) {
+    if (gradesData[i][1] === studentId) { rowsToArchive.push(gradesData[i]); rowsToDelete.push(i + 1); }
+  }
+  if (rowsToArchive.length > 0) {
+    archiveSheet.getRange(archiveSheet.getLastRow() + 1, 1, rowsToArchive.length, rowsToArchive[0].length).setValues(rowsToArchive);
+    for (let i = rowsToDelete.length - 1; i >= 0; i--) { gradesSheet.deleteRow(rowsToDelete[i]); }
+    return successResponse({}, `تم أرشفة ${rowsToArchive.length} سجل درجات للطالب.`);
+  } else {
+    return errorResponse('لم يتم العثور على درجات لهذا الطالب.');
+  }
+}
+
+function getArchivedGrades(payload) {
+  const { studentId } = payload;
+  const data = getData_(SHEETS.GRADES_ARCHIVE);
+  const studentGrades = data.filter(r => r[1] === studentId);
+  return successResponse({ grades: formatGrades(studentGrades) });
+}
+
+// ==========================================================
+//                   دوال مساعدة (Helpers)
+// ==========================================================
+function getData_(sheetName) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) {
+      Logger.log(`Sheet not found: ${sheetName}`);
+      return []; 
+  }
+  const data = sheet.getDataRange().getValues();
+  return data.length > 1 ? data.slice(1) : [];
+}
+
+function getUsersMap_() {
+  const data = getData_(SHEETS.USERS);
+  const map = new Map();
+  data.forEach(row => {
+    map.set(row[0], {
+      name: row[4], role: row[3], class: row[6], section: row[7], telegramId: row[12] 
+    });
+  });
+  return map;
+}
+
+function getSchedulesMap_() {
+  const data = getData_(SHEETS.WEEKLY_SCHEDULES);
+  const map = new Map();
+  data.forEach(row => {
+    const key = `${row[1]}-${row[2]}`; // "Class-Section"
+    try {
+      map.set(key, JSON.parse(row[3]));
+    } catch (e) {
+      Logger.log(`Error parsing schedule for ${key}`);
+    }
+  });
+  return map;
+}
+
+function findStudentsByClass(className, sectionName) {
+  const allUsers = getData_(SHEETS.USERS);
+  return allUsers.filter(r => 
+    r[3] === 'طالب' && r[5] === 'نشط' &&
+    (r[6] === className || className === 'الكل') &&
+    (r[7] === sectionName || sectionName === 'الكل' || !sectionName)
+  ).map(r => r[0]);
+}
+
+// ==========================================================
+//                   دوال تنسيق البيانات (Formatters)
+// ==========================================================
+function formatAnnouncements(data) { return data.map(r => ({ id: r[0], date: new Date(r[1]).toLocaleDateString('ar-IQ'), title: r[2], content: r[4] })).reverse(); }
+
+/**
+ * (إصلاح) دالة تنسيق الدرجات
+ * تضمن هذه الدالة أن المفاتيح المرسلة للواجهة (مثل term1_month1)
+ * تتطابق تماماً مع ما يتوقعه script.js
+ */
+function formatGrades(data) {
+  const gradesBySubject = {};
+  data.forEach(r => {
+    const subject = r[2];
+    if (!gradesBySubject[subject]) {
+      gradesBySubject[subject] = { subject: subject };
+    }
+    
+    const type = r[3]; // "Term1_Month1", "MidYear_Exam", "Term1_Avg"
+    let key_simple = '';
+    
+    // (إصلاح) مطابقة دقيقة لأسماء الحقول
+    if (type === 'Term1_Month1') key_simple = 'term1_month1';
+    else if (type === 'Term1_Month2') key_simple = 'term1_month2';
+    else if (type === 'Term1_Avg') key_simple = 'term1_avg';
+    else if (type === 'MidYear_Exam') key_simple = 'midYear_exam';
+    else if (type === 'Term2_Month1') key_simple = 'term2_month1';
+    else if (type === 'Term2_Month2') key_simple = 'term2_month2';
+    else if (type === 'Term2_Avg') key_simple = 'term2_avg';
+    else if (type === 'Yearly_Effort') key_simple = 'yearly_effort';
+    else if (type === 'Final_Exam') key_simple = 'final_exam';
+    else if (type === 'Final_Result') key_simple = 'final_result';
+    else key_simple = type.toLowerCase(); // fallback
+    
+    if (key_simple) {
+        gradesBySubject[subject][key_simple] = r[4];
+    }
+  });
+  return Object.values(gradesBySubject);
+}
+
+function formatAbsences(data) { return data.map(r => ({ date: new Date(r[2]).toLocaleDateString('ar-IQ'), notes: r[3] })); }
+function formatHomework(data) { return data.map(r => ({ date: new Date(r[1]).toLocaleDateString('ar-IQ'), subject: r[4], content: r[6] })); }
+function formatEvaluations(data) { return data.map(ev => ({ date: new Date(ev[3]).toLocaleDateString('ar-IQ'), subject: ev[4], daily_prep: ev[5], participation: ev[6], behavior: ev[7], homework: ev[8], note: ev[9] })); }
+function formatLibrary(data) { return data.map(r => ({ title: r[2], url: r[3], subject: r[6], description: r[7] })); }
+function formatExamSchedules(data) { return data.map(r => ({ title: r[3], targetClass: r[2], scheduleData: JSON.parse(r[4]) })); }
+function formatEvaluationMessage_(studentName, subject, date, evals, note, teacherName) {
+  let msg = `🔔 <b>إشعار تقييم يومي</b>\n\n`;
+  msg += `👤 الطالب: <b>${studentName}</b>\n`;
+  msg += `📅 التاريخ: ${new Date(date).toLocaleDateString('ar-IQ')}\n`;
+  msg += `📚 المادة: ${subject}\n`;
+  msg += `👨‍🏫 المدرس: ${teacherName}\n\n`;
+  msg += `📊 <b>التقييم:</b>\n`;
+  if (evals.DailyPrep) msg += `- التحضير اليومي: ${evals.DailyPrep}\n`;
+  if (evals.Participation) msg += `- المشاركة: ${evals.Participation}\n`;
+  if (evals.Behavior) msg += `- السلوك: ${evals.Behavior}\n`;
+  if (evals.Homework) msg += `- الواجب البيتي: ${evals.Homework}\n`;
+  if (note) msg += `\n📝 <b>ملاحظات:</b> ${note}\n`;
+  msg += `\n<i>إعدادية الرياحي للبنين</i>`;
+  return msg;
+}
+
+// ==========================================================
+//                   نظام الاعتراضات (جديد)
+// ==========================================================
+
+// 1. دالة تقديم اعتراض من قبل الطالب
+function submitObjection(payload, userInfo) {
+  const { subject, content } = payload;
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.OBJECTIONS);
+  const newRow = [
+    "OBJ-" + new Date().getTime() + Math.random(),
+    new Date(), userInfo.userId, subject, content,
+    'بانتظار الإدارة', 'غير محول', '', ''
+  ];
+  sheet.appendRow(newRow);
+  return successResponse({}, 'تم إرسال الاعتراض للإدارة بنجاح.');
+}
+
+// 2. دالة جلب اعتراضات الطالب الخاصة به
+function getStudentObjections(userInfo) {
+  const data = getData_(SHEETS.OBJECTIONS);
+  const myObjections = data.filter(r => r[2] === userInfo.userId).map(r => ({
+      id: r[0], date: new Date(r[1]).toLocaleDateString('ar-IQ'),
+      subject: r[3], content: r[4], adminStatus: r[5], teacherStatus: r[6], reply: r[8]
+  }));
+  return successResponse({ objections: myObjections });
+}
+
+// 3. دالة جلب الاعتراضات المعلقة للمشرف (الإدارة)
+function getAdminObjections() {
+  const data = getData_(SHEETS.OBJECTIONS);
+  const usersMap = getUsersMap_();
+  const assignments = getData_(SHEETS.TEACHER_ASSIGNMENTS);
+  
+  // (جديد) جلب قائمة كل المدرسين لإرسالها للواجهة
+  const teachersList = [];
+  usersMap.forEach((userData, userId) => {
+     if (userData.role === 'مدرس') {
+         teachersList.push({ id: userId, name: userData.name });
+     }
+  });
+
+  const pending = data.filter(r => r[5] === 'بانتظار الإدارة').map(r => {
+      const studentClass = usersMap.get(r[2])?.class;
+      const studentSection = usersMap.get(r[2])?.section;
+      // البحث عن المدرس المسؤول عن هذه المادة لهذا الصف
+      const teacherInfo = assignments.find(a => a[2] === studentClass && a[3] === studentSection && a[4] === r[3]);
+      
+      return {
+          id: r[0], date: new Date(r[1]).toLocaleDateString('ar-IQ'),
+          studentName: usersMap.get(r[2])?.name || r[2], 
+          classSection: `${studentClass} - ${studentSection}`,
+          subject: r[3], content: r[4],
+          suggestedTeacherId: teacherInfo ? teacherInfo[0] : '',
+          suggestedTeacherName: teacherInfo ? teacherInfo[1] : 'غير محدد'
+      };
+  });
+  // (تعديل) إرجاع قائمة المدرسين مع الاعتراضات
+  return successResponse({ objections: pending, teachers: teachersList });
+}
+
+// 4. دالة معالجة المشرف للاعتراض (موافقة/رفض)
+function handleAdminObjection(payload) {
+   const { objectionId, action, teacherId } = payload; 
+   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.OBJECTIONS);
+   const data = sheet.getDataRange().getValues();
+   const rowIndex = data.findIndex(r => r[0] === objectionId);
+   
+   if(rowIndex > 0) {
+       if(action === 'approve') {
+           if(!teacherId) return errorResponse('الرجاء تحديد المدرس لتحويل الاعتراض إليه.');
+           sheet.getRange(rowIndex + 1, 6).setValue('محول للمدرس');
+           sheet.getRange(rowIndex + 1, 7).setValue('قيد المراجعة');
+           sheet.getRange(rowIndex + 1, 8).setValue(teacherId);
+           return successResponse({}, 'تم تحويل الاعتراض للمدرس بنجاح.');
+       } else if (action === 'reject') {
+           sheet.getRange(rowIndex + 1, 6).setValue('مرفوض من الإدارة');
+           return successResponse({}, 'تم رفض الاعتراض.');
+       }
+   }
+   return errorResponse('لم يتم العثور على الاعتراض.');
+}
+
+// 5. دالة جلب اعتراضات المدرس المحولة إليه
+function getTeacherObjections(userInfo) {
+   const data = getData_(SHEETS.OBJECTIONS);
+   const usersMap = getUsersMap_();
+   const pending = data.filter(r => r[7] === userInfo.userId && r[6] === 'قيد المراجعة').map(r => ({
+      id: r[0], date: new Date(r[1]).toLocaleDateString('ar-IQ'),
+      studentName: usersMap.get(r[2])?.name || r[2],
+      subject: r[3], content: r[4]
+   }));
+   return successResponse({ objections: pending });
+}
+
+// 6. دالة معالجة المدرس للاعتراض (الرد عليه)
+function handleTeacherObjection(payload) {
+   const { objectionId, reply } = payload;
+   if(!reply) return errorResponse('الرجاء كتابة رد على الاعتراض.');
+   
+   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.OBJECTIONS);
+   const data = sheet.getDataRange().getValues();
+   const rowIndex = data.findIndex(r => r[0] === objectionId);
+   
+   if(rowIndex > 0) {
+       sheet.getRange(rowIndex + 1, 7).setValue('تم الرد');
+       sheet.getRange(rowIndex + 1, 9).setValue(reply);
+       return successResponse({}, 'تم إرسال الرد للطالب بنجاح.');
+   }
+   return errorResponse('لم يتم العثور على الاعتراض.');
+}
+
+/**
+ * دالة لتسجيل مشاهدة الطالب للواجبات أو الإعلانات
+ */
+function trackItemView(payload, userInfo) {
+  const { itemId, itemType } = payload;
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.VIEWS_TRACKING);
+  if (!sheet) return errorResponse('جدول التتبع غير موجود.');
+  
+  const data = sheet.getDataRange().getValues();
+  
+  // فحص إذا كان الطالب قد سجل مشاهدة لهذا العنصر مسبقاً لمنع التكرار
+  const alreadyViewed = data.some(r => r[1] === itemId && r[3] === userInfo.userId);
+  
+  if (!alreadyViewed) {
+    sheet.appendRow([
+      "VW-" + Utilities.getUuid(), // ViewID
+      itemId,                      // ItemID
+      itemType,                    // ItemType (homework/announcement)
+      userInfo.userId,             // StudentID
+      new Date()                   // ViewDate
+    ]);
+  }
+  return successResponse({}, 'تم تسجيل المشاهدة بنجاح.');
+}
+
+/**
+ * دالة جلب الإحصائيات الشاملة للوحة تحكم المشرف
+ */
+function getAdminAnalytics() {
+  const users = getData_(SHEETS.USERS);
+  const grades = getData_(SHEETS.GRADES);
+  const absences = getData_(SHEETS.ABSENCES);
+  const objections = getData_(SHEETS.OBJECTIONS);
+  const homework = getData_(SHEETS.HOMEWORK);
+
+  // حساب الأرقام بدقة
+  const analytics = {
+    studentsCount: users.filter(u => u[3] === 'طالب').length,
+    teachersCount: users.filter(u => u[3] === 'مدرس').length,
+    pendingApprovals: grades.filter(g => g[14] === 'بانتظار الموافقة').length + 
+                       absences.filter(a => a[5] === 'بانتظار الموافقة').length +
+                       homework.filter(h => h[5] === 'بانتظار الموافقة').length,
+    activeObjections: objections.filter(obj => obj[5] === 'بانتظار الإدارة').length
+  };
+
+  return successResponse({ analytics });
+}

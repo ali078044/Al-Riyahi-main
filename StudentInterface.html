@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>واجهة الطالب - اعدادية الرياحي للبنين</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root { --primary-color: #007bff; --light-blue: #f0f8ff; --border-color: #dee2e6; }
+        
+        *, *::before, *::after { box-sizing: border-box; }
+
+        body { font-family: 'Tajawal', sans-serif; background-color: #f4f7f9; margin: 0; }
+        .header { background-color: var(--primary-color); color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .header h1 { margin: 0; font-size: 1.5em; }
+        .user-info { display: flex; align-items: center; gap: 15px; }
+        #logoutBtn { background: transparent; border: 1px solid white; color: white; padding: 8px 15px; border-radius: 5px; cursor: pointer; }
+        
+        .container { max-width: 1200px; margin: 20px auto; padding: 0 20px; }
+        
+        .tabs { display: flex; flex-wrap: wrap; border-bottom: 2px solid var(--border-color); margin-bottom: 20px; }
+        .tab-button { padding: 15px 25px; cursor: pointer; background: none; border: none; font-size: 1.1em; font-weight: bold; color: #555; position: relative; border-bottom: 3px solid transparent; }
+        .tab-button.active { color: var(--primary-color); border-bottom-color: var(--primary-color); }
+        
+        .tab-content { display: none; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        .data-table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+        .data-table th, .data-table td { padding: 8px; text-align: center; border: 1px solid var(--border-color); }
+        .data-table thead { background-color: var(--light-blue); }
+        
+        .card-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+        .card { background: #fff; border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
+        .card.announcement-card { border-right: 5px solid var(--primary-color); margin-bottom: 15px;}
+        
+        .button { background-color: var(--primary-color); color: white; padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer; text-decoration: none; display: inline-block; transition: 0.3s; }
+        .button:hover { opacity: 0.9; }
+        
+        .table-responsive { overflow-x: auto; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+
+        @media (max-width: 768px) {
+            .header { padding: 15px; flex-direction: column; text-align: center; gap: 10px; }
+            .tabs { justify-content: center; }
+            .tab-button { padding: 10px; font-size: 0.85em; flex-grow: 1; }
+            #profileForm { grid-template-columns: 1fr !important; }
+        }
+    </style>
+</head>
+<body class="student-page">
+    <header class="header">
+        <h1>اعدادية الرياحي للبنين</h1>
+        <div class="user-info">
+            <span id="userName"></span>
+            <button id="logoutBtn"><i class="fas fa-sign-out-alt"></i> تسجيل الخروج</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <div id="profileAlertBanner" style="display: none; background: #fff3cd; border: 1px solid #ffeeba; color: #856404; padding: 15px; border-radius: 8px; margin-bottom: 20px; align-items: center; gap: 15px;">
+            <i class="fas fa-exclamation-triangle" style="font-size: 1.5em;"></i>
+            <div style="flex-grow: 1;">
+                <strong>تنبيه إداري:</strong> معلوماتك الشخصية (الاسم الرباعي، اسم الأم، العنوان، أو الصورة) غير مكتملة. يرجى إكمالها لتوثيق سجلاتك الرسمية.
+            </div>
+            <button onclick="showTab('profileTab')" class="button" style="background: #856404; font-size: 0.9em; border:none;">إكمال الآن</button>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-button" onclick="showTab('announcementsTab')"><i class="fas fa-bullhorn"></i> الأخبار</button>
+            <button class="tab-button" onclick="showTab('gradesTab')"><i class="fas fa-graduation-cap"></i> درجاتي</button>
+            <button class="tab-button" onclick="showTab('schedulesMainTab')"><i class="fas fa-calendar-alt"></i> الجداول</button>
+            <button class="tab-button" onclick="showTab('absencesTab')"><i class="fas fa-user-check"></i> غياباتي</button>
+            <button class="tab-button" onclick="showTab('homeworkEvalTab')"><i class="fas fa-tasks"></i> الواجبات</button>
+            <button class="tab-button" onclick="showTab('libraryTab')"><i class="fas fa-book-open"></i> المكتبة</button>
+            <button class="tab-button" onclick="showTab('objectionsTab')"><i class="fas fa-balance-scale"></i> الاعتراضات</button>
+            <button class="tab-button" onclick="showTab('profileTab')"><i class="fas fa-user-circle"></i> ملفي الشخصي</button>
+        </div>
+        
+        <div id="announcementsTab" class="tab-content">
+            <h2>آخر الأخبار والإعلانات</h2>
+            <div id="announcementsContainer"><p>جاري تحميل الإعلانات...</p></div>
+        </div>
+
+        <div id="gradesTab" class="tab-content">
+            <h2>كشف الدرجات</h2>
+            <div id="gradesContainer" class="table-responsive"><p>جاري تحميل الدرجات...</p></div>
+        </div>
+
+        <div id="absencesTab" class="tab-content">
+            <h2>سجل الغياب</h2>
+            <div id="absencesContainer" class="table-responsive"><p>جاري تحميل الغيابات...</p></div>
+        </div>
+
+        <div id="schedulesMainTab" class="tab-content">
+            <h2>الجداول الدراسية</h2>
+            <h3><i class="fas fa-calendar-week"></i> جدولي الأسبوعي</h3>
+            <div id="weeklyScheduleContainer" class="table-responsive"><p>جاري تحميل الجدول...</p></div>
+            <hr style="margin: 30px 0;">
+            <h3><i class="fas fa-tasks"></i> جداول الامتحانات</h3>
+            <div id="examSchedulesContainer"><p>جاري تحميل جداول الامتحانات...</p></div>
+        </div>
+
+        <div id="homeworkEvalTab" class="tab-content">
+            <h2>الواجبات اليومية والتقييمات</h2>
+            <h3><i class="fas fa-pencil-alt"></i> الواجبات والتبليغات</h3>
+            <div id="homeworkContainer" class="card-container"><p>جاري تحميل الواجبات...</p></div>
+            <hr style="margin: 30px 0;">
+            <h3><i class="fas fa-user-graduate"></i> سجل التقييم اليومي</h3>
+            <div id="evaluationsContainer" class="table-responsive"><p>جاري تحميل التقييمات...</p></div>
+        </div>
+
+        <div id="libraryTab" class="tab-content">
+            <h2>المكتبة الرقمية</h2>
+            <div id="libraryContainer" class="card-container"><p>جاري تحميل المكتبة...</p></div>
+        </div>
+
+        <div id="objectionsTab" class="tab-content">
+            <h2>تقديم ومتابعة الاعتراضات</h2>
+            <div style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #dee2e6; margin-bottom: 20px;">
+                <h3><i class="fas fa-paper-plane"></i> تقديم اعتراض جديد</h3>
+                <form id="objectionForm" style="display: flex; flex-direction: column; gap: 15px;">
+                    <input type="text" id="objSubject" placeholder="المادة (مثال: الرياضيات - امتحان الشهر الأول)" style="padding: 10px; border: 1px solid #ccc; border-radius: 5px;" required>
+                    <textarea id="objContent" rows="4" placeholder="اكتب تفاصيل الاعتراض أو الملاحظة هنا بدقة..." style="padding: 10px; border: 1px solid #ccc; border-radius: 5px;" required></textarea>
+                    <button type="submit" class="button"><i class="fas fa-paper-plane"></i> إرسال الاعتراض للإدارة</button>
+                </form>
+            </div>
+            <div id="myObjectionsContainer" class="table-responsive"><p>جاري تحميل سجل الاعتراضات...</p></div>
+        </div>
+
+        <div id="profileTab" class="tab-content">
+            <h2><i class="fas fa-id-card"></i> إدارة المعلومات الشخصية</h2>
+            <form id="profileForm" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; background: white; padding: 20px; border-radius: 8px;">
+                
+                <div style="grid-column: span 2; display: flex; align-items: center; gap: 30px; border-bottom: 2px solid #f0f2f5; padding-bottom: 20px; margin-bottom: 10px;">
+                    <div style="text-align: center;">
+                        <img id="profilePreview" src="https://via.placeholder.com/130" style="width: 130px; height: 130px; border-radius: 50%; object-fit: cover; border: 4px solid #007bff;">
+                        <input type="file" id="profilePicInput" accept="image/*" style="display:none">
+                        <button type="button" onclick="document.getElementById('profilePicInput').click()" class="button" style="margin-top:12px; font-size: 0.85em; background: #6c757d;"><i class="fas fa-camera"></i> تحديث الصورة</button>
+                    </div>
+                    <div style="flex-grow: 1;">
+                        <label style="font-weight: bold; display: block; margin-bottom: 8px;">الاسم الرباعي واللقب (كما في الهوية):</label>
+                        <input type="text" id="profFullName" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px;" required>
+                    </div>
+                </div>
+
+                <div class="form-group"><label>اسم الأم الثلاثي:</label><input type="text" id="profMotherName" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;" required></div>
+                <div class="form-group"><label>تاريخ الولادة:</label><input type="date" id="profDOB" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;"></div>
+                <div class="form-group" style="grid-column: span 2;"><label>عنوان السكن (المحافظة/الحي/نقطة دالة):</label><input type="text" id="profAddress" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;"></div>
+                
+                <div class="form-group"><label>رقم هاتف الطالب:</label><input type="tel" id="profStudentPhone" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;" required></div>
+                <div class="form-group"><label>رقم هاتف ولي الأمر:</label><input type="tel" id="profGuardianPhone" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;" required></div>
+
+                <div class="form-group" style="grid-column: span 2; background: #f8f9fa; padding: 15px; border-radius: 8px; border-right: 4px solid #0088cc;">
+                    <label style="font-weight: bold; color: #0088cc;">معرف تليجرام (Telegram ID):</label>
+                    <input type="text" id="profTelegramId" placeholder="مثال: 123456789" style="width: 100%; padding: 10px; margin-top: 8px; border: 1px solid #ddd; border-radius: 6px;">
+                    <p style="font-size: 0.85em; color: #555; margin-top: 10px; line-height: 1.5;">
+                        <i class="fas fa-info-circle"></i> <strong>كيف تحصل على المعرف؟</strong><br>
+                        ابحث في تليجرام عن بوت باسم <code>@userinfobot</code>، أرسل له أي رسالة وسيرد عليك برقم المعرف. انسخه وضعه هنا لتفعيل الإشعارات.
+                    </p>
+                </div>
+
+                <div class="form-group">
+                    <label>فصيلة الدم:</label>
+                    <select id="profBloodType" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                        <option value="">-- اختر --</option><option value="A+">A+</option><option value="A-">A-</option>
+                        <option value="B+">B+</option><option value="B-">B-</option><option value="O+">O+</option>
+                        <option value="O-">O-</option><option value="AB+">AB+</option><option value="AB-">AB-</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>ملاحظات طبية:</label><input type="text" id="profMedical" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;"></div>
+
+                <div class="form-group" style="grid-column: span 2;"><hr style="border: 0; border-top: 1px solid #eee; margin: 10px 0;"></div>
+                <div class="form-group" style="grid-column: span 2;">
+                    <label style="color: #dc3545;">تغيير كلمة المرور (اتركها فارغة لعدم التغيير):</label>
+                    <input type="password" id="profNewPass" placeholder="اكتب كلمة السر الجديدة هنا" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                </div>
+                
+                <div style="grid-column: span 2;">
+                    <button type="submit" class="button" style="width: 100%; padding: 15px; font-weight: bold;"><i class="fas fa-save"></i> حفظ وتحديث ملفي الشخصي</button>
+                </div>
+            </form>
+        </div>
+    </div> <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="script.js"></script>
+</body>
+</html>
